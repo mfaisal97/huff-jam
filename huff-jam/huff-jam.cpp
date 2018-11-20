@@ -19,23 +19,32 @@ enum HuffJamCommand
 
 struct HuffNode
 {
+	HuffNode* parent;
 	HuffNode* rightChild;
 	HuffNode* leftChild;
-	char val;
+	long val;
 	bool original = false;
+	bool parentExist = false;
 	string encoding;
 	char originalChar;
+	string getEncoding(){
+		if(parentExist)
+			return parent->getEncoding() + encoding;
+		else 
+			return encoding;
+	}
 };
 
 HuffJamCommand ParseInput(int argsNum, char* argv[]) {
-	if (argsNum < 3) {
+	string command = argv[1];
+	if (argsNum < 4) {
 		return notcommand;
 	}
-	else if (argv[0] == "compress")
+	else if (command == "compress")
 	{
 		return compress;
 	}
-	else if (argv[0] == "decompress") {
+	else if (command == "decompress") {
 		return decompress;
 	}
 	else {
@@ -46,8 +55,8 @@ HuffJamCommand ParseInput(int argsNum, char* argv[]) {
 class HuffComparator
 {
 public:
-	bool operator()(const HuffNode& nodeOne, const HuffNode& nodeTwo) {
-		return nodeOne.val > nodeTwo.val;
+	bool operator()(const HuffNode* nodeOne, const HuffNode* nodeTwo) {
+		return nodeOne->val > nodeTwo->val;
 	}
 };
 
@@ -65,57 +74,70 @@ void CompressFile(ifstream& InputFile, ofstream& OutputFile) {
 	vector<long> Freqs(maxCharsNum, initialCount);
 	string inputFileContent;
 	getline(InputFile, inputFileContent, (char)InputFile.eof());
-	char currentCharacter;
 	for (char& currentCharacter : inputFileContent) {
-		++Freqs[unsigned char(currentCharacter)];
+		++Freqs[unsigned int(currentCharacter)];
 	}
 
 	//Doing Initial huffman encoding
-	priority_queue<HuffNode, vector<HuffNode>, HuffComparator> huffEncoding;
+	vector<HuffNode*> DistinctNodes;
+	priority_queue<HuffNode*, vector<HuffNode*>, HuffComparator> huffEncoding;
 	for (int i = 0; i <Freqs.size();++i) {
 		if (Freqs[i] != initialCount) {
-			huffEncoding.push(HuffNode{
-				rig
-				}
+			HuffNode* NewNode = new HuffNode();
+			NewNode->val = Freqs[i];
+			NewNode->original = true;
+			NewNode->originalChar = char(i);
+			huffEncoding.push(NewNode);
+			DistinctNodes.push_back(NewNode);
 		}
 	}
 
+	system("pause");
+
 	//Optimizing the encoding
-	while (huffEncoding.size() > 2) {
+	while (huffEncoding.size() > 1) {
 		auto nodeOne = huffEncoding.top();
 		huffEncoding.pop();
 		auto nodeTwo = huffEncoding.top();
 		huffEncoding.pop();
 
-		huffEncoding.push(HuffNode{ &nodeOne, &nodeTwo, (nodeOne.val + nodeTwo.val), false });
-	}
+		HuffNode* NewNode = new HuffNode;
 
+		NewNode->rightChild = nodeOne;
+		nodeOne->encoding = "1";
+		nodeOne->parent = NewNode;
+		nodeOne->parentExist = true;
+
+		NewNode->leftChild = nodeTwo;
+		nodeTwo->encoding = "0";
+		nodeTwo->parent = NewNode;
+		nodeTwo->parentExist = true;
+
+
+		NewNode->val = (nodeOne->val + nodeTwo->val);
+		NewNode->original = false;
+		NewNode->encoding = "";
+
+		huffEncoding.push(NewNode);
+	}
+	system("pause");
 
 	//preparing file header
 	map<char, string> Mapping;
-	while (huffEncoding.size() > 0) {
-		 auto root = huffEncoding.top();
-		 huffEncoding.pop();
-
-		 if (!(root.original)) {
-			 root.leftChild->encoding = root.encoding + "0";
-			 root.rightChild->encoding = root.encoding + "1";
-
-			 huffEncoding.push(*(root.leftChild));
-			 huffEncoding.push(*(root.rightChild));
-		 }
-		 else {
-			 Mapping[root.originalChar] = root.encoding;
-		 }
-
+	cout << DistinctNodes.size() <<endl;
+	for (int i = 0; i < DistinctNodes.size(); i++){
+		Mapping[DistinctNodes[i]->originalChar] = DistinctNodes[i]->getEncoding();
+		cout << DistinctNodes[i]->originalChar << "\tgot\t" << Mapping[DistinctNodes[i]->originalChar] << endl;
 	}
+	system("pause");
+
+	cout << "a7aeh tany" << endl;
 
 	//writing file header
 	OutputFile << Mapping.size() << '\n';
 	for (map<char, string>::iterator it = Mapping.begin(); it != Mapping.end(); ++it) {
 		OutputFile << it->second << '\t' << it->first;
 	}
-
 
 	//write file content
 	string OutputContentBinaryString = "";
@@ -126,7 +148,7 @@ void CompressFile(ifstream& InputFile, ofstream& OutputFile) {
 	string OutputContent = "";
 	long sz = OutputContentBinaryString.size();
 	long charNum = sz / 8;
-	for (long i; i < charNum; ++i) {
+	for (long i = 0; i < charNum; ++i) {
 		bitset<8> num(OutputContentBinaryString.substr(i * 8, 8));
 		OutputContent = OutputContent + char(num.to_ulong());
 	}
@@ -180,10 +202,12 @@ void ExecuteCommand(const HuffJamCommand & cmd, const string & InputFileName, co
 			else if (cmd == decompress) {
 				DecompressFile(InputFile, OutputFile);
 			}
+			OutputFile.close();
 		}
 		else {
 			cout << "Error Opening Output File!\n";
 		}		
+		InputFile.close();
 	}
 	else {
 		cout << "Error Opening Input File!\n";
@@ -191,16 +215,16 @@ void ExecuteCommand(const HuffJamCommand & cmd, const string & InputFileName, co
 }
 
 int main(int argc, char *argv[]) {
-	
+
 	HuffJamCommand cmd = ParseInput(argc, argv);
 	if (cmd == notcommand) {
 		PrintInstructions();
 	}
 	else
 	{
-		ExecuteCommand(cmd, argv[1], argv[2]);
+		ExecuteCommand(cmd, argv[2], argv[3]);
 	}
 
-	system("pause");
+	//system("pause");
 	return 0;
 }
