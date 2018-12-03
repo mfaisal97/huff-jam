@@ -83,7 +83,7 @@ void CompressFile(ifstream& InputFile, ofstream& OutputFile) {
 	string inputFileContent;
 	getline(InputFile, inputFileContent, (char)InputFile.eof());
 	for (char& currentCharacter : inputFileContent) {
-		++Mapping[unsigned int(currentCharacter)].freq;
+		++Mapping[unsigned char(currentCharacter)].freq;
 		++charNums;
 	}
 	system("pause");
@@ -137,25 +137,25 @@ void CompressFile(ifstream& InputFile, ofstream& OutputFile) {
 	cout << "Writing File Header" << endl;
 	cout << DistinctNodes.size() <<endl;
 	for (int i = 0; i < DistinctNodes.size(); i++){
-		Mapping[int (DistinctNodes[i]->originalChar)].encoding = DistinctNodes[i]->getEncoding();
-		cout << DistinctNodes[i]->originalChar << "\tgot\t" << Mapping[DistinctNodes[i]->originalChar].encoding << endl;
+		Mapping[unsigned char (DistinctNodes[i]->originalChar)].encoding = DistinctNodes[i]->getEncoding();
+		cout << DistinctNodes[i]->originalChar << "\tgot\t" << Mapping[unsigned char (DistinctNodes[i]->originalChar)].encoding << endl;
 	}
-	system("pause");
-
 
 	//writing file header
 	OutputFile << charNums << "\t" << DistinctNodes.size() << '\n';
 	for (int i = 0; i < maxCharsNum; ++i) {
-		if (Mapping[i].freq != initialCount)
-			OutputFile << Mapping[i].encoding << '\t' << char(i);
+		if (Mapping[unsigned char(i)].freq != initialCount)
+			OutputFile << Mapping[unsigned char(i)].encoding << '\t' << char(i);
 	}
+	
+	system("pause");
 
 	//write file content
 	string OutputContentBinaryString = "";
 	string OutputContent = "";
 	for (char& currentCharacter : inputFileContent)
 	{
-		OutputContentBinaryString = OutputContentBinaryString + Mapping[currentCharacter].encoding;
+		OutputContentBinaryString = OutputContentBinaryString + Mapping[unsigned char (currentCharacter)].encoding;
 
 		if (OutputContentBinaryString.size() > 1024) {
 			for (long i = 0; i < 128; ++i) {
@@ -178,6 +178,26 @@ void CompressFile(ifstream& InputFile, ofstream& OutputFile) {
 		OutputContent = OutputContent + char(num.to_ulong());
 	}
 	OutputFile << OutputContent;
+
+	system("pause");
+
+	double compressRatio = 0;
+	for (int i = 0; i < maxCharsNum; ++i) {
+		if (Mapping[unsigned char(i)].freq != initialCount)
+			compressRatio += (Mapping[unsigned char(i)].freq * Mapping[unsigned char(i)].encoding.length());
+	}
+	compressRatio /= (charNums);
+	compressRatio /= 8;
+	
+	double CodingEntroby = 0;
+	for (int i = 0; i < maxCharsNum; i++) {
+		if (Mapping[unsigned char(i)].freq != initialCount)
+			CodingEntroby += (Mapping[unsigned char(i)].freq  * log(Mapping[unsigned char(i)].freq * 0.1 / maxCharsNum));
+	}
+	CodingEntroby = -1.0 * (CodingEntroby) / charNums;
+
+	cout << "\n\nCompressionRatio:\t" << compressRatio << "\n";
+	cout << "Efficiency:\t" << CodingEntroby/compressRatio*8 << endl;
 }
 
 void DecompressFile(ifstream& InputFile, ofstream& OutputFile) {
