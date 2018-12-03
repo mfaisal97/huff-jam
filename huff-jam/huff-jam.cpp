@@ -6,6 +6,7 @@
 #include <functional>
 #include <map>
 #include <bitset>
+#include <algorithm>
 
 
 using namespace std;
@@ -25,7 +26,7 @@ struct HuffNode
 	long val;
 	bool original = false;
 	bool parentExist = false;
-	string encoding;
+	string encoding = "0";
 	char originalChar;
 	string getEncoding(){
 		if(parentExist)
@@ -33,6 +34,11 @@ struct HuffNode
 		else 
 			return encoding;
 	}
+};
+
+struct Encoding {
+	int freq = 0;
+	string encoding;
 };
 
 HuffJamCommand ParseInput(int argsNum, char* argv[]) {
@@ -69,30 +75,34 @@ inline void PrintInstructions() {
 void CompressFile(ifstream& InputFile, ofstream& OutputFile) {
 	const long initialCount = 0;
 	const long maxCharsNum = 256;
+	long charNums = 0;
 	
+	cout << "Calculating characters frequency" << endl;
 	//Counting Freq
-	vector<long> Freqs(maxCharsNum, initialCount);
+	vector<Encoding> Mapping(maxCharsNum);
 	string inputFileContent;
 	getline(InputFile, inputFileContent, (char)InputFile.eof());
 	for (char& currentCharacter : inputFileContent) {
-		++Freqs[unsigned int(currentCharacter)];
+		++Mapping[unsigned int(currentCharacter)].freq;
+		++charNums;
 	}
+	system("pause");
 
+
+	cout << "Preparing The encoding" << endl;
 	//Doing Initial huffman encoding
 	vector<HuffNode*> DistinctNodes;
 	priority_queue<HuffNode*, vector<HuffNode*>, HuffComparator> huffEncoding;
-	for (int i = 0; i <Freqs.size();++i) {
-		if (Freqs[i] != initialCount) {
+	for (int i = 0; i < Mapping.size(); ++i) {
+		if (Mapping[i].freq != initialCount) {
 			HuffNode* NewNode = new HuffNode();
-			NewNode->val = Freqs[i];
+			NewNode->val = Mapping[i].freq;
 			NewNode->original = true;
 			NewNode->originalChar = char(i);
 			huffEncoding.push(NewNode);
 			DistinctNodes.push_back(NewNode);
 		}
 	}
-
-	system("pause");
 
 	//Optimizing the encoding
 	while (huffEncoding.size() > 1) {
@@ -122,79 +132,106 @@ void CompressFile(ifstream& InputFile, ofstream& OutputFile) {
 	}
 	system("pause");
 
+
 	//preparing file header
-	map<char, string> Mapping;
+	cout << "Writing File Header" << endl;
 	cout << DistinctNodes.size() <<endl;
 	for (int i = 0; i < DistinctNodes.size(); i++){
-		Mapping[DistinctNodes[i]->originalChar] = DistinctNodes[i]->getEncoding();
-		cout << DistinctNodes[i]->originalChar << "\tgot\t" << Mapping[DistinctNodes[i]->originalChar] << endl;
+		Mapping[int (DistinctNodes[i]->originalChar)].encoding = DistinctNodes[i]->getEncoding();
+		cout << DistinctNodes[i]->originalChar << "\tgot\t" << Mapping[DistinctNodes[i]->originalChar].encoding << endl;
 	}
 	system("pause");
 
-	cout << "a7aeh tany" << endl;
 
 	//writing file header
-	OutputFile << Mapping.size() << '\n';
-	for (map<char, string>::iterator it = Mapping.begin(); it != Mapping.end(); ++it) {
-		OutputFile << it->second << '\t' << it->first;
+	OutputFile << charNums << "\t" << DistinctNodes.size() << '\n';
+	for (int i = 0; i < maxCharsNum; ++i) {
+		if (Mapping[i].freq != initialCount)
+			OutputFile << Mapping[i].encoding << '\t' << char(i);
 	}
 
 	//write file content
 	string OutputContentBinaryString = "";
+	string OutputContent = "";
 	for (char& currentCharacter : inputFileContent)
 	{
-		OutputContentBinaryString = OutputContentBinaryString + Mapping[currentCharacter];
+		OutputContentBinaryString = OutputContentBinaryString + Mapping[currentCharacter].encoding;
+
+		if (OutputContentBinaryString.size() > 1024) {
+			for (long i = 0; i < 128; ++i) {
+				string feedString = OutputContentBinaryString.substr(i * 8, 8);
+				reverse(feedString.begin(), feedString.end());
+				bitset<8> num(feedString);
+				OutputFile << char(num.to_ulong());
+			}
+			OutputContentBinaryString = OutputContentBinaryString.substr(1024);
+		}
 	}
-	string OutputContent = "";
+
+	
 	long sz = OutputContentBinaryString.size();
 	long charNum = sz / 8;
-	for (long i = 0; i < charNum; ++i) {
-		bitset<8> num(OutputContentBinaryString.substr(i * 8, 8));
+	for (long i = 0; i <= charNum; ++i) {
+		string feedString = OutputContentBinaryString.substr(i * 8, 8);
+		reverse(feedString.begin(), feedString.end());
+		bitset<8> num(feedString);
 		OutputContent = OutputContent + char(num.to_ulong());
 	}
-	bitset<8> num(OutputContentBinaryString.substr(charNum * 8));
-	OutputContent = OutputContent + char(num.to_ulong());
-
 	OutputFile << OutputContent;
 }
 
 void DecompressFile(ifstream& InputFile, ofstream& OutputFile) {
 	int encodingSize;
+	long charNums;
 
-	InputFile >> encodingSize;
+	InputFile >> charNums >> encodingSize;
+	cout << encodingSize << endl;
 	map<string, char> Mapping;
 
+	system("pause");
 	for (int i = 0; i < encodingSize; ++i) {
 		string encoding;
 		char seperator;
 		char encodedChar;
-		InputFile >> encoding >> seperator >> encodedChar;
+		InputFile >> encoding;
+		InputFile.get(seperator);
+		InputFile.get(encodedChar);
+		Mapping[encoding] = encodedChar;
+		cout << Mapping[encoding] << "\t" << encoding << endl;
 	}
 
+	system("pause");
 	string code = "";
 	char NextCharacter;
 	string OriginalContent = "";
 
-	while (InputFile >> NextCharacter) {
-		bitset<8> NextCharacterBits(NextCharacter);
-		int i = 7;
-		while (i > -1) {
-			code += char(NextCharacterBits[i--] - '0') + code;
+	InputFile.get(NextCharacter);
 
+	while (charNums > 0) {
+		bitset<8> NextCharacterBits((int)NextCharacter);
+		int i = 0;
+		while (i < 8 && charNums > 0) {
+			code = code + char(NextCharacterBits[i++] + '0');
+			//cout<< code <<endl; 
+			//system("pause");
 			map<string, char>::iterator decodedChar = Mapping.find(code);
 			if (decodedChar != Mapping.end()) {
 				OriginalContent += decodedChar->second;
+				//cout << decodedChar->first << "\t" << decodedChar->second <<endl;
 				code = "";
+				--charNums;
 			}
+
 		}
+		InputFile.get(NextCharacter);
 	}
 	OutputFile << OriginalContent;
 }
 
 void ExecuteCommand(const HuffJamCommand & cmd, const string & InputFileName, const string & OutputFileName) {
-	ifstream InputFile(InputFileName);
+	ifstream InputFile(InputFileName, ios::binary);
 	if (InputFile.is_open()) {
-		ofstream OutputFile(OutputFileName, std::ofstream::out | std::ofstream::trunc);
+		ofstream OutputFile(OutputFileName, std::ofstream::out | std::ofstream::trunc | ios::binary);
 		if (OutputFile.is_open()) {
 			if (cmd == compress) {
 				CompressFile(InputFile, OutputFile);
