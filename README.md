@@ -1,5 +1,5 @@
 # huff-jam
-This project implements the huff-jam compression algorithm.
+This project implements the huff-jam compression algorithm. Check information below for usage.
 
 For compression:
 {Path-To-Executable} compress {input-file-path} {compressed-file-path}.bin
